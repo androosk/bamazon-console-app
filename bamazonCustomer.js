@@ -1,10 +1,10 @@
-// require('dotenv').config()
 let mysql = require('mysql')
 let inquirer = require('inquirer')
 let Table = require('cli-table2')
 let colors = require('colors')
 let orderItem = []
 let orderQuant = 0
+let newSales = 0
 
 var connection = mysql.createConnection({
   host: "localhost",
@@ -71,6 +71,7 @@ function orderError() {
 function completeOrder() {
   let newQuant = orderItem[0].stock_quantity - orderQuant
   let orderTotal = orderQuant * orderItem[0].price
+  let newSales = orderItem[0].product_sales + orderTotal
   let table = new Table({
     head: ['Item'.bold, {hAlign: 'center', content: 'Quantity'.bold}, {hAlign: 'right', content: 'Price'.bold}],
     colWidths: [40,10,10]
@@ -83,7 +84,8 @@ function completeOrder() {
     'UPDATE products SET ? WHERE ?',
     [
       {
-        stock_quantity: newQuant
+        stock_quantity: newQuant,
+        product_sales: newSales
       },
       {
         item_id: orderItem[0].item_id

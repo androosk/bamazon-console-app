@@ -35,7 +35,7 @@ function runMenu(){
     {
       type: 'list',
       message: 'What would you like to do today?'.green.bold,
-      choices: ['View Products for Sale'.cyan.bold, 'View Low Inventory'.cyan.bold, 'Add to Inventory'.cyan.bold, 'Add New Product'.cyan.bold, 'Exit'.cyan.bold],
+      choices: ['View Products for Sale'.cyan.bold, 'View Low Inventory'.cyan.bold, 'Add to Current Inventory'.cyan.bold, 'Add New Product'.cyan.bold, 'Exit'.cyan.bold],
       name: 'choice'
     }
   ]).then(function(selection) {
@@ -47,7 +47,7 @@ function runMenu(){
     case 'View Low Inventory'.cyan.bold:
       searchMax = 5
       getTable()
-      break;
+      break
     case 'Add to Current Inventory'.cyan.bold:
       addInventory()
       break
@@ -77,31 +77,28 @@ function getTable() {
     runMenu()
   })
 }
+
 function addInventory() {
-  console.log('smackerel')
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'idNum',
+      message: 'Please select the stock number of the item you would like to restock.'
+    }
+  ]).then(function(id_number) {
+    rsId = id_number.idNum
+    var query = connection.query('SELECT * FROM products WHERE item_id=' + rsId, function(err,res){
+      if (err || res.length == 0) stockError()
+      else {
+        rsQuant = res[0].stock_quantity
+        rsPname = res[0].product_name
+        rsDepartment = res[0].department_name
+        rsUnit = res[0].unit_cost
+        getQuantity()
+      }
+    })
+  })
 }
-// function addInventory() {
-//   console.log('bazzle')
-  // inquirer.prompt([
-  //   {
-  //     type: 'input',
-  //     name: 'idNum',
-  //     message: 'Please select the stock number of the item you would like to restock.'
-  //   }
-  // ]).then(function(id_number) {
-  //   rsId = id_number.idNum
-  //   var query = connection.query('SELECT * FROM products WHERE item_id=' + rsId, function(err,res){
-  //     if (err || res.length == 0) stockError()
-  //     else {
-  //       rsQuant = res[0].stock_quantity
-  //       rsPname = res[0].product_name
-  //       rsDepartment = res[0].department_name
-  //       rsUnit = res[0].unit_cost
-  //       getQuantity()
-  //     }
-  //   })
-  // })
-// }
 //Chaining inquirer callbacks throws a console error. Since we have to evaluate whether the user
 //has entered a valid replenishment query before requesting a quantity, I separated the functions
 function getQuantity() {
@@ -132,27 +129,23 @@ function getQuantity() {
 function addToOverhead() {
   var query = connection.query('SELECT * FROM departments WHERE department_name ="' + rsDepartment +'"', function(err,res){
     if (res[0].over_head_costs) {
-      //let newWholeCost = res[0].over_head_costs + wholeCost
-      console.log(res[0].over_head_costs)
+      newWholeCost = parseFloat(res[0].over_head_costs + wholeCost).toFixed(2)
     }
     else {
-      //let newWholeCost = wholeCost
-      console.log(res[0].over_head_costs)
+      newWholeCost = wholeCost
     }
-    // console.log(newWholeCost)
-    // let deptId = res[0].department_id
-    // console.log(deptId)
-    // connection.query(
-    //   'UPDATE departments SET ? WHERE ?',
-    //   [
-    //     {
-    //       over_head_costs: newWholeCost
-    //     },
-    //     {
-    //       department_id: deptId
-    //     }
-    //   ]
-    // )
+    let deptId = res[0].department_id
+    connection.query(
+      'UPDATE departments SET ? WHERE ?',
+      [
+        {
+          over_head_costs: newWholeCost
+        },
+        {
+          department_id: deptId
+        }
+      ]
+    )
   })
   viewOneItem()
 }
@@ -256,16 +249,17 @@ function addUnitPrice() {
     }
   ]).then(function(unitPrice) {
     addUnitPrice = unitPrice.unitPrice
-    wholeCost = addUnitPrice * addQuant
+    wholeCost = parseFloat(addUnitPrice * addQuant).toFixed(2)
     addToTable()
   })
 }
 function addToTable() {
-    var sql = 'INSERT INTO products (product_name, department_name, price, stock_quantity) VALUES ("' + rsId + '","' + rsDepartment + '",' + parseFloat(addPrice).toFixed(2) + ',' + addQuant + ')'
+    var sql = 'INSERT INTO products (product_name, department_name, price, unit_cost, stock_quantity) VALUES ("' + rsId + '","' + rsDepartment + '",' + parseFloat(addPrice).toFixed(2) + ',' + parseFloat(addUnitPrice).toFixed(2) + ',' + addQuant + ')'
     connection.query(sql, (err, results, fields) => {
       if (err) stockError()
       console.log('\nInventory addition successful! ' + rsId + ' added.')
       finder = 'product_name'
+      console.log('spork')
       addToOverhead()
     })
 }

@@ -16,6 +16,7 @@ let addPrice = 0
 let addQuant = 0
 let wholeCost = 0
 let departmentList = []
+let newWholeCost = 0
 
 var connection = mysql.createConnection({
   host: "localhost",
@@ -46,8 +47,8 @@ function runMenu(){
     case 'View Low Inventory'.cyan.bold:
       searchMax = 5
       getTable()
-      break
-    case 'Add to Inventory'.cyan.bold:
+      break;
+    case 'Add to Current Inventory'.cyan.bold:
       addInventory()
       break
     case 'Add New Product'.cyan.bold:
@@ -59,45 +60,48 @@ function runMenu(){
   })
   }
 //TODO Sort items by department and item name
-  function getTable() {
-    console.log('\n')
-    var query = "SELECT * FROM products";
-    connection.query(query, function(err, res) {
-      let table = new Table({
-        head: ['ID'.bold, 'Item Description'.bold, {hAlign: 'center', content: 'Department'.bold}, {hAlign: 'center', content: 'Price'.bold}, 'In Stock'.bold],
-        colWidths: [5,40,20,10,10]
-      })
-      for (var i = 0; i < res.length; i++) {
-        if (res[i].stock_quantity <= searchMax) {
-          table.push([colors.cyan.bold(res[i].item_id), res[i].product_name, res[i].department_name,{hAlign:'right', content :'$'+parseFloat(res[i].price).toFixed(2)}, {hAlign: 'right', content: res[i].stock_quantity}])
-        }
-      }
-      console.log(table.toString())
-      runMenu()
+function getTable() {
+  console.log('\n')
+  var query = "SELECT * FROM products";
+  connection.query(query, function(err, res) {
+    let table = new Table({
+      head: ['ID'.bold, 'Item Description'.bold, {hAlign: 'center', content: 'Department'.bold}, {hAlign: 'center', content: 'Price'.bold}, 'In Stock'.bold],
+      colWidths: [5,40,20,10,10]
     })
-  }
-
-function addInventory() {
-  inquirer.prompt([
-    {
-      type: 'input',
-      name: 'idNum',
-      message: 'Please select the stock number of the item you would like to restock.'
+    for (var i = 0; i < res.length; i++) {
+      if (res[i].stock_quantity <= searchMax) {
+        table.push([colors.cyan.bold(res[i].item_id), res[i].product_name, res[i].department_name,{hAlign:'right', content :'$'+parseFloat(res[i].price).toFixed(2)}, {hAlign: 'right', content: res[i].stock_quantity}])
+      }
     }
-  ]).then(function(id_number) {
-    rsId = id_number.idNum
-    var query = connection.query('SELECT * FROM products WHERE item_id=?', [rsId], function(err,res){
-      if (err || res.length == 0) stockError()
-      else {
-        rsQuant = res[0].stock_quantity
-        rsPname = res[0].product_name
-        rsDepartment = res[0].department_name
-        rsUnit = res[0].unit_cost
-        getQuantity()
-      }
-    })
+    console.log(table.toString())
+    runMenu()
   })
 }
+function addInventory() {
+  console.log('smackerel')
+}
+// function addInventory() {
+//   console.log('bazzle')
+  // inquirer.prompt([
+  //   {
+  //     type: 'input',
+  //     name: 'idNum',
+  //     message: 'Please select the stock number of the item you would like to restock.'
+  //   }
+  // ]).then(function(id_number) {
+  //   rsId = id_number.idNum
+  //   var query = connection.query('SELECT * FROM products WHERE item_id=' + rsId, function(err,res){
+  //     if (err || res.length == 0) stockError()
+  //     else {
+  //       rsQuant = res[0].stock_quantity
+  //       rsPname = res[0].product_name
+  //       rsDepartment = res[0].department_name
+  //       rsUnit = res[0].unit_cost
+  //       getQuantity()
+  //     }
+  //   })
+  // })
+// }
 //Chaining inquirer callbacks throws a console error. Since we have to evaluate whether the user
 //has entered a valid replenishment query before requesting a quantity, I separated the functions
 function getQuantity() {
@@ -110,8 +114,6 @@ function getQuantity() {
   ]).then(function(item) {
     newQuant = parseInt(item.quantity) + parseInt(rsQuant)
     wholeCost = rsUnit * item.quantity
-    console.log(wholeCost)
-    console.log(rsDepartment)
     connection.query(
       'UPDATE products SET ? WHERE ?',
       [
@@ -121,20 +123,38 @@ function getQuantity() {
         {
           item_id: rsId
         }
-      ],
-      'UPDATE departments SET ? WHERE ?',
-      [
-        {
-          over_head_costs: (wholeCost + over_head_costs)
-        },
-        {
-          department_name: rsDepartment
-        }
       ]
     )
     finder = 'item_id'
-    viewOneItem()
+    addToOverhead()
   })
+}
+function addToOverhead() {
+  var query = connection.query('SELECT * FROM departments WHERE department_name ="' + rsDepartment +'"', function(err,res){
+    if (res[0].over_head_costs) {
+      //let newWholeCost = res[0].over_head_costs + wholeCost
+      console.log(res[0].over_head_costs)
+    }
+    else {
+      //let newWholeCost = wholeCost
+      console.log(res[0].over_head_costs)
+    }
+    // console.log(newWholeCost)
+    // let deptId = res[0].department_id
+    // console.log(deptId)
+    // connection.query(
+    //   'UPDATE departments SET ? WHERE ?',
+    //   [
+    //     {
+    //       over_head_costs: newWholeCost
+    //     },
+    //     {
+    //       department_id: deptId
+    //     }
+    //   ]
+    // )
+  })
+  viewOneItem()
 }
 //Again, I was having issues with ansynchronous callbacks on multiple questions, so I separated them to make them synchronous.
 //Is this the most performant solution at scale? No. But at this level, it works perfectly fine.
@@ -171,7 +191,7 @@ function addNewDepartment() {
         choices: departmentList
       }
     ]).then(function(department) {
-      addDept = department.department
+      rsDepartment = department.department
       addNewPrice()
     })
   })
@@ -197,7 +217,6 @@ function addNewPrice() {
     addNewQuantity()
   })
 }
-//TODO Add inquirer prompt for the wholesale unit cost
 function addNewQuantity() {
   inquirer.prompt([
     {
@@ -216,17 +235,38 @@ function addNewQuantity() {
     }
   ]).then(function(quantity) {
     addQuant = quantity.stock
+    addUnitPrice()
+  })
+}
+function addUnitPrice() {
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'unitPrice',
+      message: 'Please enter the wholesale unit price with no dollar sign: ',
+      validate: function(value) {
+        var pass = value.match(
+          /^[.0-9]{1,100}$/
+        )
+        if (pass) {
+          return true
+        }
+        return 'PLEASE ENTER A VALID UNIT PRICE'
+      }
+    }
+  ]).then(function(unitPrice) {
+    addUnitPrice = unitPrice.unitPrice
+    wholeCost = addUnitPrice * addQuant
     addToTable()
   })
 }
-//TODO Add computation and insertion of wholesale purchase cost into database
 function addToTable() {
-    var sql = 'INSERT INTO products (product_name, department_name, price, stock_quantity) VALUES ("' + rsId + '","' + addDept + '",' + parseFloat(addPrice).toFixed(2) + ',' + addQuant + ')'
+    var sql = 'INSERT INTO products (product_name, department_name, price, stock_quantity) VALUES ("' + rsId + '","' + rsDepartment + '",' + parseFloat(addPrice).toFixed(2) + ',' + addQuant + ')'
     connection.query(sql, (err, results, fields) => {
       if (err) stockError()
       console.log('\nInventory addition successful! ' + rsId + ' added.')
       finder = 'product_name'
-      viewOneItem()
+      addToOverhead()
     })
 }
 

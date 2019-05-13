@@ -6,9 +6,9 @@ let colors = require('colors')
 var connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
-  user: "androosk",
-  password: "1234",
-  database: "bamazon_DB"
+  user: "root",
+  password: "",
+  database: ""
 });
 connection.connect(function(err) {
   if (err) throw err

@@ -1,11 +1,16 @@
+//Set variables for dependencies and program business
 let mysql = require('mysql')
+//inquirer is the dependency for the user menus
 let inquirer = require('inquirer')
+//cli-table2 allows pretty printing of sql tables in the console. It eliminates the need for column title aliasing
+//and makes the tables easy for the user to read
 let Table = require('cli-table2')
+//colors makes the data easier to read by rendering text colors for varying menu and input items
 let colors = require('colors')
 let orderItem = []
 let orderQuant = 0
 let newSales = 0
-
+//Set mysql server connection
 var connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
@@ -17,6 +22,7 @@ connection.connect(function(err) {
   if (err) throw err
   runSearch()
 })
+//Query the products table from the server and serves up the menu for the user to buy an item
 function runSearch() {
   var query = "SELECT * FROM products";
   connection.query(query, function(err, res) {
@@ -31,6 +37,7 @@ function runSearch() {
     getTheOrder()
   })
 }
+//Greet the user and ask them what they would like to buy
 function getTheOrder(){
   console.log('\nWelcome to Bamazon! The console everything store. What would you like to buy today?'.magenta.bold)
   inquirer.prompt([
@@ -49,11 +56,12 @@ function getTheOrder(){
             name: 'quantity',
             message: 'Please enter a quantity of '.magenta.bold + colors.cyan.bold(res[0].product_name) + ' that you would like to order:'.magenta.bold
           }
+        //Check if the item is available in the quantity selected
         ]).then(function(item) {
           if (item.quantity > parseInt(res[0].stock_quantity)) {
             console.log('\nWe are sorry. There are not enough '.magenta.bold + colors.cyan.bold(res[0].product_name) + 's'.cyan.bold + ' currently in stock to satisfy your order.'.magenta.bold)
             orderAgain()
-          }
+          }//If so, complete the order
           else {
             orderItem = res
             orderQuant = item.quantity
@@ -64,10 +72,12 @@ function getTheOrder(){
     })
   })
 }
+//If the item is not valid, let the user know and restart the process
 function orderError() {
   console.log('\nWe are sorry. That item is not in our inventory.\nPlease choose another item. Thank you!'.magenta.bold)
   runSearch()
 }
+//If the order was valid, complete it
 function completeOrder() {
   let newQuant = orderItem[0].stock_quantity - orderQuant
   let orderTotal = orderQuant * orderItem[0].price
@@ -80,6 +90,7 @@ function completeOrder() {
   table.push(['TOTAL ORDER', '', {hAlign:'right', content :'$'+parseFloat(orderTotal).toFixed(2)}])
   console.log(table.toString())
   console.log('Your order has been completed!\nThank you for helping Bamazon take over the world today!')
+  //Update the database by removing the item from the stock_quantity in the quantity of the order and adding the sales amount to the product_sales amount
   connection.query(
     'UPDATE products SET ? WHERE ?',
     [
@@ -94,6 +105,7 @@ function completeOrder() {
   )
   orderAgain()
 }
+//Ask the user if they want to order again or exit
 function orderAgain() {
   inquirer.prompt([
     {

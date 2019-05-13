@@ -2,8 +2,6 @@ let mysql = require('mysql')
 let inquirer = require('inquirer')
 let Table = require('cli-table2')
 let colors = require('colors')
-let orderItem = []
-let orderQuant = 0
 let finder = ''
 let searchMax = 0
 let rsPname = ''
@@ -11,7 +9,6 @@ let rsId = ''
 let rsDepartment = ''
 let rsQuant = 0
 let rsUnit = 0
-let addDept = ''
 let addPrice = 0
 let addQuant = 0
 let wholeCost = 0
@@ -27,8 +24,9 @@ var connection = mysql.createConnection({
 });
 connection.connect(function(err) {
   if (err) throw err
+  runMenu()
 })
-
+//Welcome user to the Manager Console, list functions available
 function runMenu(){
   console.log('\nWelcome to the Bamazon manager console.'.cyan.bold)
   inquirer.prompt([
@@ -59,7 +57,9 @@ function runMenu(){
     }
   })
   }
-//TODO Sort items by department and item name
+//Function that shows inventory in a table, by id. This function uses a variable called searchMax that sets a parameter
+//based on amount in stock. If the manager is viewing the generic Products for sale, searchMax = 100000, which will show
+//all inventory. If it View low inventory was chosen, searchMax = 5 which will show items where stock_quantity < 6.
 function getTable() {
   console.log('\n')
   var query = "SELECT * FROM products";
@@ -77,7 +77,7 @@ function getTable() {
     runMenu()
   })
 }
-
+//This begins a series of two inquirer prompts that will allow the manager to restock an existing item the third function in this chain updates the department table over_head_costs column
 function addInventory() {
   inquirer.prompt([
     {
@@ -99,14 +99,14 @@ function addInventory() {
     })
   })
 }
-//Chaining inquirer callbacks throws a console error. Since we have to evaluate whether the user
+//Asynchronously chaining inquirer callbacks seems to frequently throw a console error. Since we have to evaluate whether the user
 //has entered a valid replenishment query before requesting a quantity, I separated the functions
 function getQuantity() {
   inquirer.prompt([
     {
       type: 'input',
       name: 'quantity',
-      message: 'Please enter the quantity of ' + rsPname + ' that you would like to restock:'
+      message: 'Please enter the quantity of ' + colors.cyan.bold(rsPname) + ' that you would like to restock:'
     }
   ]).then(function(item) {
     newQuant = parseInt(item.quantity) + parseInt(rsQuant)
@@ -149,7 +149,7 @@ function addToOverhead() {
   })
   viewOneItem()
 }
-//Again, I was having issues with ansynchronous callbacks on multiple questions, so I separated them to make them synchronous.
+//Again, I was having issues with ansynchronous callbacks on multiple inquirer questions where mysql queries needed to be made or set, so I separated them to make them synchronous.
 //Is this the most performant solution at scale? No. But at this level, it works perfectly fine.
 function addNewProduct() {
   inquirer.prompt([
@@ -254,20 +254,21 @@ function addUnitPrice() {
   })
 }
 function addToTable() {
-    var sql = 'INSERT INTO products (product_name, department_name, price, unit_cost, stock_quantity) VALUES ("' + rsId + '","' + rsDepartment + '",' + parseFloat(addPrice).toFixed(2) + ',' + parseFloat(addUnitPrice).toFixed(2) + ',' + addQuant + ')'
-    connection.query(sql, (err, results, fields) => {
-      if (err) stockError()
-      console.log('\nInventory addition successful! ' + rsId + ' added.')
-      finder = 'product_name'
-      console.log('spork')
-      addToOverhead()
-    })
+  var sql = 'INSERT INTO products (product_name, department_name, price, unit_cost, stock_quantity, product_sales) VALUES ("' + rsId + '","' + rsDepartment + '",' + parseFloat(addPrice).toFixed(2) + ',' + parseFloat(addUnitPrice).toFixed(2) + ',' + addQuant + ',' + 0 + ')'
+  console.log(sql)
+  connection.query(sql, (err, results, fields) => {
+    if (err) stockError()
+    console.log('\nInventory addition successful! ' + rsId + ' added.')
+    finder = 'product_name'
+    addToOverhead()
+  })
 }
 
 function stockError() {
   console.log('\nWe are sorry. That item is not in the Bamazon system.\nPlease choose another item to replenish. Thank you!'.magenta.bold)
   runMenu()
 }
+//This function shows a single row table for an updated item
 function viewOneItem() {
   console.log('\n')
     var query = 'SELECT * FROM products WHERE ' + finder + ' = ' + '"' + rsId +'"'
@@ -283,5 +284,3 @@ function viewOneItem() {
       runMenu()
     })
 }
-//Start with the opening menu
-runMenu()
